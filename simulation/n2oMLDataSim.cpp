@@ -14,6 +14,7 @@ int main(int argc, char* argv[]) {
   std::string fileName = "n2oMLData";
   std::string outputDir = "./output/testing/";
 
+  bool makeStatic = false;
   bool plotVerbose = false;
 
 
@@ -76,9 +77,15 @@ int main(int argc, char* argv[]) {
   double scale = 1e19;
   std::string runID;
   std::vector<double> n1, n2, n3;
-  std::vector< std::vector<double> > lineOuts;
+  std::vector< std::vector<double> > curLineOuts;
+  std::vector< std::vector<double> > lineOuts(NtimeSteps);
   std::map<std::string, double> inpVals;
-  inpVals["x1"] = 0; inpVals["x2"] = 0; inpVals["x3"] = 0;
+  inpVals["z1"] = 0; inpVals["z2"] = 0; inpVals["z3"] = 0;
+  inpVals["x"] = 0; inpVals["y"] = 0;
+  for (it=0; it<NtimeSteps; it++) {
+    lineOuts[it].resize(NradDiffBins);
+  }
+
 
   // Calculate scattering amplitudes
   n2oMC.makeMolEnsemble(inpVals);
@@ -95,6 +102,7 @@ int main(int argc, char* argv[]) {
               //= diffP.interpScatAmp(n2oMC.atomTypes[ia], ang, iang);
     }
   }
+
 
   // Calculate X matrix for fitting bessels
   float irShift = 0;
@@ -159,10 +167,14 @@ int main(int argc, char* argv[]) {
   /////  Running Simulation  /////
   ////////////////////////////////
 
-  for (int ism=0; ism<Nsimulations; ism++) {
+  int tShift = 1;
+  if (makeStatic) {
+    tShift = 0;
+    Nsimulations = 1;
+    NtimeSteps = 1;
+  }
 
-    if (ism == 20)
-      exit(0);
+  for (int ism=0; ism<Nsimulations; ism++) {
 
     runID = to_string(std::time(0) - 1499887450) 
             + to_string(n2oMC.samplePDF("uniform"));
@@ -176,20 +188,23 @@ int main(int argc, char* argv[]) {
 
     //////  Simulate Time Dynamics  /////
     for (it=0; it<NtimeSteps; it++) {
-      itm = it*tStep;
+
+      // Dynamics are set by changing coefficients of normal modes
+      // if itm=0 then all coefficients should be 0
+      itm = (it + tShift)*tStep;
       n1 = n1fxn(itm, 0);
       n2 = n2fxn(itm, 0);
       n3 = n3fxn(itm, 0);
 
-      c1 = sin(w1*itm);
-      c2 = sin(w2*itm);
-      c3 = sin(w3*itm);
-      inpVals["z1"] = 6*(0.5 - n2oMC.samplePDF("uniform")); //c1*n1[0] + c2*n2[0] + c3*n3[0];
-      inpVals["z2"] = 6*(0.5 - n2oMC.samplePDF("uniform")); //c1*n1[1] + c2*n2[1] + c3*n3[1];
-      inpVals["z3"] = 6*(0.5 - n2oMC.samplePDF("uniform")); //c1*n1[2] + c2*n2[2] + c3*n3[2];
+      c1 = 1.5*sin(w1*itm);
+      c2 = 1.5*sin(w2*itm);
+      c3 = 1.5*sin(w3*itm);
+      inpVals["z1"] = c1*n1[0] + c2*n2[0] + c3*n3[0];
+      inpVals["z2"] = c1*n1[1] + c2*n2[1] + c3*n3[1];
+      inpVals["z3"] = c1*n1[2] + c2*n2[2] + c3*n3[2];
 
-      inpVals["y"] = 6*(0.5 - n2oMC.samplePDF("uniform")); //sin(wy*it);
-      inpVals["x"] = 6*(0.5 - n2oMC.samplePDF("uniform")); //sin(wx*it);
+      inpVals["y"] = sin(wy*it);
+      inpVals["x"] = sin(wx*it);
 
       //cout<<"it: "<<it<<endl;
       //cout<<inpVals["z1"]<<"  "<<inpVals["z1"]<<"  "<<inpVals["z1"]<<endl;
@@ -203,19 +218,21 @@ int main(int argc, char* argv[]) {
       DIFFRACTIONclass diffP(&n2oMC, qMax, Iebeam, screenDist, elEnergy, bins,
           "/reg/neh/home5/khegazy/simulations/scatteringAmplitudes/3.7MeV/");
 
-      lineOuts = diffP.lineOut_uniform();
+      curLineOuts = diffP.lineOut_uniform();
 
       if (bins%2) {
-        Y0(0) = lineOuts[1][0];
+        Y0(0) = curLineOuts[1][0];
+        lineOuts[it][0] = curLineOuts[1][0];
         qShift = 1;
       }
       else {
         qShift = 0;
       }
 
-      for (uint i=qShift; i<lineOuts[1].size(); i++) {
-        Y0(i) = lineOuts[1][i];
-        Y(i-qShift) = lineOuts[1][i];
+      for (uint i=qShift; i<curLineOuts[1].size(); i++) {
+        Y0(i) = curLineOuts[1][i];
+        Y(i-qShift) = curLineOuts[1][i];
+        lineOuts[it][i] = curLineOuts[1][i];
       }
 
       // Isotropy projection
@@ -262,8 +279,8 @@ int main(int argc, char* argv[]) {
       //FILE* otpSp = fopen((outFilePrefix + "sPattern_" 
       //      + outFileSuffix + ".dat").c_str(), "wb");
     
-      fwrite(&lineOuts[0][0], sizeof(double), lineOuts[0].size(), otpDp);
-      fwrite(&lineOuts[1][0], sizeof(double), lineOuts[1].size(), otpMp);
+      fwrite(&curLineOuts[0][0], sizeof(double), curLineOuts[0].size(), otpDp);
+      fwrite(&curLineOuts[1][0], sizeof(double), curLineOuts[1].size(), otpMp);
 
       fclose(otpDp);
       //fclose(otpAp);
@@ -273,32 +290,50 @@ int main(int argc, char* argv[]) {
     }
 
     std::string outFileName;
-    outFileName = outFilePrefix + "_" + runID + "_BESSELPROJ_Ntime-"
-        + to_string(NtimeSteps) + "_Nbessels-"
-        + to_string(Nbessels) + "_iso-1_Nradii-"
-        + to_string(Nradii);
-    if (index) {
-      outFileName += "_Job-" + to_string(index);
+    // Name of Bessel data file
+    if (makeStatic) {
+      outFileName = "output/" + fileName 
+          + "_Static_BESSELPROJ_Nbessels-" 
+          + to_string(Nbessels) + "_iso-1_Nradii-"
+          + to_string(Nradii) + ".dat";
     }
-    outFileName += ".dat";
+    else {
+      outFileName = outFilePrefix + "_" + runID + "_BESSELPROJ_Ntime-"
+          + to_string(NtimeSteps) + "_Nbessels-"
+          + to_string(Nbessels) + "_iso-1_Nradii-"
+          + to_string(Nradii);
+      if (index) {
+        outFileName += "_Job-" + to_string(index);
+      }
+      outFileName += ".dat";
+    }
+    // Bessel data file
     FILE* outBesselFile = fopen(outFileName.c_str(), "wb");
 
-    outFileName = outFilePrefix + "_" + runID + "_ATOMPOS_Ntime-"
-        + to_string(NtimeSteps) + "_Natoms-"
-        + to_string(n2oMC.NmolAtoms) + "_Pos-3";
-    if (index) {
-      outFileName += "_Job-" + to_string(index);
+    // name of position data file
+    if (makeStatic) {
+      outFileName = "output/" + fileName 
+          + "_Static_ATOMPOS_Natoms-" + to_string(n2oMC.NmolAtoms) 
+          + "_Pos-3_Nradii-" + to_string(Nradii) + ".dat";
     }
-    outFileName += ".dat";
+    else {
+      outFileName = outFilePrefix + "_" + runID + "_ATOMPOS_Ntime-"
+          + to_string(NtimeSteps) + "_Natoms-"
+          + to_string(n2oMC.NmolAtoms) 
+          + "_Pos-3_Nradii" + to_string(Nradii);
+      if (index) {
+        outFileName += "_Job-" + to_string(index);
+      }
+      outFileName += ".dat";
+    }
+    // Position data file
     FILE* outAtomPosFile = fopen(outFileName.c_str(), "wb");
  
+    // Write data files
     for (it=0; it<NtimeSteps; it++) {
-      for (uint i=0; i<15; i++) {
-        //cout<<coeffs[it][i]<<"    ";
-      }
-      //cout<<endl;
       fwrite(&coeffs[it][0], sizeof(float), coeffs[it].size(), outBesselFile);
       fwrite(&positions[it][0], sizeof(float), positions[it].size(), outAtomPosFile);
+      fwrite(&lineOuts[it][0], sizeof(float), lineOuts[it].size(), outAtomPosFile);
     }
     fclose(outBesselFile);
     fclose(outAtomPosFile);
