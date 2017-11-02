@@ -2,7 +2,8 @@ import tensorflow as tf
 import numpy as np
 import modelCLASS as md
 import lstm_config as cf
-
+import os
+import collections
 
 
 ########################
@@ -86,8 +87,9 @@ def getData(dataDir, config):
 
 
   dataX = np.array(dataX_List)
-  dataX[:,0] /= 100
+  dataX = np.reshape(dataX, (dataX.shape[0], NtimeSteps, xSize))
   dataY = np.array(dataY_List)
+  dataY = np.reshape(dataY, (dataY.shape[0], NtimeSteps, ySize))
 
   return dataX, dataY 
 
@@ -109,9 +111,9 @@ class molMovLSTMCLASS(md.modelCLASS):
   #####  Initialize Placeholders  #####
   def _initialize_placeHolders(self):
     self.X_placeHolder = tf.placeholder(tf.float32,
-                          [None, self.config.time_length, self.config.Nfeatures])
+                          [None, self.config.Nframes, self.config.Nfeatures])
     self.Y_placeHolder = tf.placeholder(tf.float32,
-                          [None, self.config.Noutputs])
+                          [None, self.config.Nframes, self.config.Noutputs])
     self.isTraining_placeHolder = tf.placeholder(tf.bool)
     self.preProcess_placeHolder = tf.placeholder(tf.bool)
 
@@ -122,7 +124,7 @@ class molMovLSTMCLASS(md.modelCLASS):
   """
   def predict(self):
 
-    if self.preProcess_placeHolder:
+    if self.preProcess_placeHolder is True:
       ppFC1   = tf.layers.dense(inputs=self.X_placeHolder, units=self.Nbessels*int(3*self.Nradii/4))
       ppBN1   = tf.layers.batch_normalization(ppFC1, training=self.isTraining_placeHolder)
       ppRelu1 = tf.nn.relu(ppBN1)
@@ -135,10 +137,10 @@ class molMovLSTMCLASS(md.modelCLASS):
       ppFC4   = tf.layers.dense(ppRelu3, units=self.Nbessels*int(self.Nradii/4))
       preProc = tf.layers.batch_normalization(ppFC4, training=self.isTraining_placeHolder)
 
-      hidden_states, _ = tf.nn.dynamic_rnn(lstm, preProc, dtype=tf.float32)
+      hidden_states, _ = tf.nn.dynamic_rnn(self.lstm_cells, preProc, dtype=tf.float32)
 
     else:
-      hidden_states, _ = tf.nn.dynamic_rnn(lstm, self.X_placeHolder, dtype=tf.float32)
+      hidden_states, _ = tf.nn.dynamic_rnn(self.lstm_cells, self.X_placeHolder, dtype=tf.float32)
 
 
     ###  Output NN  ###
@@ -155,16 +157,22 @@ class molMovLSTMCLASS(md.modelCLASS):
 
   #####  Total Loss Function  #####
   def calculate_loss(self, predictions, Y):
+    if self.verbose:
+      print("In Loss function")
     ###  Loss from comparing atom positions  ###
-    positionLoss = tf.reduce_mean(tf.pow((predictions[:,-1,:] - Y), 2))
+    positionLoss = tf.reduce_mean(tf.pow((predictions - Y), 2))
 
     ###  Loss from comparing diffraction diffraction pattern  ###
 
+    if self.verbose:
+      print("Exiting Loss function: {}".format(positionLoss))
     return positionLoss
 
 
   #####  Total Accuracy  #####
   def calculate_accuracy(self, predictions, Y):
-    return tf.reduce_mean(tf.abs((predictions[:,-1,:] - Y)/(Y + 0.0001)))
+    if self.verbose:
+      print("In Accuracy function")
+    return tf.reduce_mean(tf.abs((predictions - Y)/(Y + 0.0001)))
 
 
