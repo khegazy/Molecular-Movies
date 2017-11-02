@@ -5,82 +5,166 @@ import lstm_config as cf
 
 
 
+########################
+###  Importing Data  ###
+########################
+
+def getData(dataDir, config):
+
+  #####  Initialize Variables  #####
+  fileName_list = os.listdir(dataDir)
+  dataX_List = []
+  dataY_List = []
+  fileNames_inds = collections.defaultdict(list)
+
+  #####  Finding size parameters from file names  #####
+  NtimeSteps  = int(0)
+  Nbessels    = int(0)
+  Nradii      = int(0)
+  Natoms      = int(0)
+  Npos        = int(0)
+  xSize       = int(0)
+  ySize       = int(0)
+  for fName in fileName_list:
+    if fName.find("_BESSEL") != -1:
+      ind1 = fName.find("Ntime")
+      ind2 = fName.find("_Nbessels")
+      NtimeSteps = int(fName[ind1+6:ind2])
+      ind1 = fName.find("_iso")
+      Nbessels = int(fName[ind2+10:ind1])
+      ind1 = fName.find("_Nradii")
+      ind2 = fName.find("_Job")
+      Nradii = int(fName[ind1+8:ind2])
+      break
+
+  for fName in fileName_list:
+    if fName.find("_ATOM") != -1:
+      ind1 = fName.find("Natoms")
+      ind2 = fName.find("_Pos")
+      Natoms = int(fName[ind1+7:ind2])
+      ind1 = fName.find("_Job")
+      Npos = int(fName[ind2+5:ind1])
+      break
+
+  xSize = (1 + Nbessels*Nradii)
+  ySize = (Npos*Natoms)
+
+  ### Check parameters from file match config
+  if NtimeSteps != config.Nframes:
+    raise RuntimeError("The number of time steps (frames) does not match!!!")
+  if Nbessels != config.Nbessels:
+    raise RuntimeError("The number of Bessel functions in data does not match!!!")
+  if Natoms != config.Natoms:
+    raise RuntimeError("The number of atoms in data does not match!!!")
+  if xSize != config.Nfeatures:
+    raise RuntimeError("The number of features in data does not match!!!")
+  if ySize != config.Noutputs:
+    raise RuntimeError("The number of outputs in data does not match!!!")
 
 
-def getData(dataDir):
- fileName_list = os.listdir(dataDir)
- dataX_List = []
- dataY_List = []
- fileNames_inds = collections.defaultdict(list)
- for fName in fileName_list:
-   if fName.find("n2oMLData") == -1:
-     continue
- 
-   ind = fName.find("n2oMLData")+10
-   fileID = fName[ind:ind+15]
-   fileNames_inds[float(fileID)].append(fName)
- 
- for key,fNames in fileNames_inds.items():
-   for fName in fNames:
-     indA = fName.find("_ATOM")
-     indB = fName.find("_BESSEL")
- 
-     #print(dataDir + fName)
-     if indB != -1:
-       #print(np.fromfile(dataDir + fName, dtype=np.float32)[:10])
-       dataX_List.append(np.fromfile(dataDir + fName, dtype=np.float32))
-     elif indA != -1:
-       #print(np.fromfile(dataDir + fName, dtype=np.float32)[:10])
-       dataY_List.append(np.fromfile(dataDir + fName, dtype=np.float32))
- 
- #####  Finding size parameters from file names  #####
- NtimeSteps  = int(0)
- Nbessels    = int(0)
- Nradii      = int(0)
- Natoms      = int(0)
- Npos        = int(0)
- xSize       = int(0)
- ySize       = int(0)
- for fName in fileName_list:
-   if fName.find("_BESSEL") != -1:
-     ind1 = fName.find("Ntime")
-     ind2 = fName.find("_Nbessels")
-     NtimeSteps = int(fName[ind1+6:ind2])
-     ind1 = fName.find("_iso")
-     Nbessels = int(fName[ind2+10:ind1])
-     ind1 = fName.find("_Nradii")
-     ind2 = fName.find("_Job")
-     Nradii = int(fName[ind1+8:ind2])
-     break
- 
- for fName in fileName_list:
-   if fName.find("_ATOM") != -1:
-     ind1 = fName.find("Natoms")
-     ind2 = fName.find("_Pos")
-     Natoms = int(fName[ind1+7:ind2])
-     ind1 = fName.find("_Job")
-     Npos = int(fName[ind2+5:ind1])
-     break
- 
- xSize = (1 + Nbessels*Nradii)
- ySize = (Npos*Natoms)
- 
- dataX = np.array(dataX_List)
- dataX[:,0] /= 100
- dataY = np.array(dataY_List)
- 
- 
+  #####  Retrieve Data From Files  #####
+
+  ###  Make Dictionary of lists [XfileName, YfileName]  ###
+  for fName in fileName_list:
+    if fName.find("n2oMLData") == -1:
+      continue
+
+    ind = fName.find("n2oMLData")+10
+    fileID = fName[ind:ind+15]
+    fileNames_inds[float(fileID)].append(fName)
+
+  ###  Get data from files  ###
+  for key,fNames in fileNames_inds.items():
+    for fName in fNames:
+      indA = fName.find("_ATOM")
+      indB = fName.find("_BESSEL")
+
+      if indB != -1:
+        dataX_List.append(np.fromfile(dataDir + fName, dtype=np.float32))
+      elif indA != -1:
+        dataY_List.append(np.fromfile(dataDir + fName, dtype=np.float32))
+
+
+  dataX = np.array(dataX_List)
+  dataX[:,0] /= 100
+  dataY = np.array(dataY_List)
+
+  return dataX, dataY 
+
+
+
+
+##################################################
+###  Defining Virtual Functions in modelCLASS  ###
+##################################################
 
 
 class molMovLSTMCLASS(md.modelCLASS):
-  
+
+  #####  Initialization  #####
   def __init__(self, inp_config, inp_data, **inp_kwargs):
     md.modelCLASS.__init__(self, config = inp_config, data = inp_data, kwargs = inp_kwargs)
 
  
+  #####  Initialize Placeholders  #####
   def _initialize_placeHolders(self):
     self.X_placeHolder = tf.placeholder(tf.float32,
-                          [None, self.config.time_length, self.config.X_length])
+                          [None, self.config.time_length, self.config.Nfeatures])
     self.Y_placeHolder = tf.placeholder(tf.float32,
-                          [None, self.config.output_size])
+                          [None, self.config.Noutputs])
     self.isTraining_placeHolder = tf.placeholder(tf.bool)
+    self.preProcess_placeHolder = tf.placeholder(tf.bool)
+
+
+  #####  Prediction  #####
+  """
+  This is basically the full neural network up to the logits/predictions
+  """
+  def predict(self):
+
+    if self.preProcess_placeHolder:
+      ppFC1   = tf.layers.dense(inputs=self.X_placeHolder, units=self.Nbessels*int(3*self.Nradii/4))
+      ppBN1   = tf.layers.batch_normalization(ppFC1, training=self.isTraining_placeHolder)
+      ppRelu1 = tf.nn.relu(ppBN1)
+      ppFC2   = tf.layers.dense(ppRelu1, units=self.Nbessels*int(self.Nradii/2))
+      ppBN2   = tf.layers.batch_normalization(ppFC2, training=self.isTraining_placeHolder)
+      ppRelu2 = tf.nn.relu(ppBN2)
+      ppFC3   = tf.layers.dense(ppRelu2, units=self.Nbessels*int(self.Nradii/4))
+      ppBN3   = tf.layers.batch_normalization(ppFC3, training=self.isTraining_placeHolder)
+      ppRelu3 = tf.nn.relu(ppBN3)
+      ppFC4   = tf.layers.dense(ppRelu3, units=self.Nbessels*int(self.Nradii/4))
+      preProc = tf.layers.batch_normalization(ppFC4, training=self.isTraining_placeHolder)
+
+      hidden_states, _ = tf.nn.dynamic_rnn(lstm, preProc, dtype=tf.float32)
+
+    else:
+      hidden_states, _ = tf.nn.dynamic_rnn(lstm, self.X_placeHolder, dtype=tf.float32)
+
+
+    ###  Output NN  ###
+    FC1   = tf.layers.dense(hidden_states, units=self.config.layer_size*5)
+    BN1   = tf.layers.batch_normalization(FC1, training=self.isTraining_placeHolder)
+    relu1 = tf.nn.relu(BN1)
+    FC2   = tf.layers.dense(relu1, units=self.config.layer_size*2)
+    BN2   = tf.layers.batch_normalization(FC2, training=self.isTraining_placeHolder)
+    relu2 = tf.nn.relu(BN2)
+    output= tf.layers.dense(relu2, self.config.Noutputs)
+
+    return output
+
+
+  #####  Total Loss Function  #####
+  def calculate_loss(self, predictions, Y):
+    ###  Loss from comparing atom positions  ###
+    positionLoss = tf.reduce_mean(tf.pow((predictions[:,-1,:] - Y), 2))
+
+    ###  Loss from comparing diffraction diffraction pattern  ###
+
+    return positionLoss
+
+
+  #####  Total Accuracy  #####
+  def calculate_accuracy(self, predictions, Y):
+    return tf.reduce_mean(tf.abs((predictions[:,-1,:] - Y)/(Y + 0.0001)))
+
+

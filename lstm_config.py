@@ -13,9 +13,13 @@ class configCLASS():
     self.minimizer = "Adam"
 
     # Data size
-    self.time_length = 3
-    self.X_length = 10
-    self.output_size = 3
+    self.Nframes    = 3
+    self.Nbessels   = 3
+    self.Nradii     = 20
+    self.Nfeatures  = 10
+    self.Natoms     = 3
+    self.Nfeatures  = 1 + self.Nbessels*self.Nradii
+    self.Noutputs   = 3*self.Natoms
 
     # Network size
     self.layer_size = 2

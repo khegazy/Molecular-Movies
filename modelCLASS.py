@@ -20,7 +20,7 @@ class modelCLASS(object):
         modelCLASS.__init__(self, config = inp_config, data = inp_data, kwargs = inp_kwargs)
       def _initialize_placeHolders(self):
         Function to initialize place holders, only rand during __init__
-      def predit(self):
+      def predict(self):
         Function containing the network architecture to output the 
         predictions or logits
       def calculate_loss(self, preds, Y):
@@ -61,7 +61,7 @@ class modelCLASS(object):
         data size, network parameters, parameterize the training, and 
         hold any other input variables into modelCLASS.
       data:
-        Data to be trained and validated on. Data is a dictionary of of 
+        Data to be trained and validated on. Data is a dictionary of 
         [string : np.ndarray] pairs with the following keys:
           data["train_X"] = training sample features
           data["train_Y"] = training sample labels
