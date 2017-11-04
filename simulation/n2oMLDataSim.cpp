@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
   std::string runID;
   std::vector<double> n1, n2, n3;
   std::vector< std::vector<double> > curLineOuts;
-  std::vector< std::vector<double> > lineOuts(NtimeSteps);
+  std::vector< std::vector<float> > lineOuts(NtimeSteps);
   std::map<std::string, double> inpVals;
   inpVals["z1"] = 0; inpVals["z2"] = 0; inpVals["z3"] = 0;
   inpVals["x"] = 0; inpVals["y"] = 0;
@@ -314,13 +314,13 @@ int main(int argc, char* argv[]) {
     if (makeStatic) {
       outFileName = "output/" + fileName 
           + "_Static_ATOMPOS_Natoms-" + to_string(n2oMC.NmolAtoms) 
-          + "_Pos-3_Nradii-" + to_string(Nradii) + ".dat";
+          + "_Pos-3_NdiffBins-" + to_string(NradDiffBins) + ".dat";
     }
     else {
       outFileName = outFilePrefix + "_" + runID + "_ATOMPOS_Ntime-"
           + to_string(NtimeSteps) + "_Natoms-"
           + to_string(n2oMC.NmolAtoms) 
-          + "_Pos-3_Nradii" + to_string(Nradii);
+          + "_Pos-3_NdiffBins-" + to_string(NradDiffBins);
       if (index) {
         outFileName += "_Job-" + to_string(index);
       }
