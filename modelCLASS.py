@@ -75,6 +75,23 @@ class modelCLASS(object):
           verbose: enable print statements during training
     """
 
+    ####################################
+    ###  Network Specific Variables  ###
+    ####################################
+    """
+    EDIT HERE
+    Add any additional variables (placeholders) specific to the network here.
+    """
+  
+    self.X_static_placeHolder   = None
+    self.Y_static_placeHolder   = None
+    self.preProcess_placeHolder = None
+    
+
+    ###################################
+    ### Standard/Required Variables ###
+    ###################################
+
     # Config
     self.config = config
 
@@ -110,7 +127,7 @@ class modelCLASS(object):
     # Network cells
     self.lstm_cells = tf.contrib.rnn.MultiRNNCell(
                         [tf.contrib.rnn.LSTMCell(self.config.Nhidden_states) 
-                          for _ in range(self.config.time_length)])
+                          for _ in range(self.config.Nframes)])
 
     # Placeholders
     self.X_placeHolder = None
@@ -217,6 +234,10 @@ class modelCLASS(object):
     self.config.batch_size: Maximimum size of each minibatch
     self.config.sample_step: Save and print (if verbose) the loss and 
         accuracy of each minibatch
+
+    EDIT
+      If there are network specific placeholders then the feed_dicts in 
+      this function must be changed to accommodate them.
     """  
 
     #####  Reset if needed  #####
@@ -248,7 +269,10 @@ class modelCLASS(object):
                        feed_dict = { 
                          self.X_placeHolder : self.data["train_X"][minibatch_indices], 
                          self.Y_placeHolder : self.data["train_Y"][minibatch_indices], 
-                         self.isTraining_placeHolder : True})
+                         self.X_static_placeHolder : self.data["static_X"],
+                         self.Y_static_placeHolder : self.data["static_Y"],
+                         self.isTraining_placeHolder : True,
+                         self.preProcess_placeHolder : self.config.preProcess})
 
         # Sample training stats
         if count%self.config.sample_step == 0:
@@ -260,7 +284,10 @@ class modelCLASS(object):
                                           feed_dict = { 
                                             self.X_placeHolder : self.data["val_X"], 
                                             self.Y_placeHolder : self.data["val_Y"], 
-                                            self.isTraining_placeHolder : False})
+                                            self.X_static_placeHolder : self.data["static_X"],
+                                            self.Y_static_placeHolder : self.data["static_Y"],
+                                            self.isTraining_placeHolder : False,
+                                            self.preProcess_placeHolder : self.config.preProcess})
           self.loss_history["val"][ind] = curLoss
           self.accuracy_history["val"][ind] = curAcc
 
@@ -274,13 +301,19 @@ class modelCLASS(object):
                                          feed_dict = { 
                                            self.X_placeHolder : self.data["train_X"], 
                                            self.Y_placeHolder : self.data["train_Y"], 
-                                           self.isTraining_placeHolder : False})
+                                           self.X_static_placeHolder : self.data["static_X"],
+                                           self.Y_static_placeHolder : self.data["static_Y"],
+                                           self.isTraining_placeHolder : False,
+                                           self.preProcess_placeHolder : self.config.preProcess})
 
     loss_val, acc_val, preds_val       = self.sess.run([self.loss, self.accuracy, self.predictions], 
                                          feed_dict = { 
                                            self.X_placeHolder : self.data["val_X"], 
-                                           self.Y_placeHolder : self.data["val_Y"], 
-                                           self.isTraining_placeHolder : False})
+                                           self.Y_placeHolder : self.data["val_Y"],  
+                                           self.X_static_placeHolder : self.data["static_X"],
+                                           self.Y_static_placeHolder : self.data["static_Y"],
+                                           self.isTraining_placeHolder : False,
+                                           self.preProcess_placeHolder : self.config.preProcess})
     if self.verbose:
       print("\n\n")
       print("###########################")
@@ -323,6 +356,24 @@ class modelCLASS(object):
     plt.savefig("trainingHistory.png")
 
     plt.show()
+
+
+  #############################################################################
+  def evaluate(self, outputs, feed_dict):
+    """
+    Run the session with inputs from feed_dict and return the outputs listed
+    in the list outputs. The following lines are required, but more items 
+    can be added to the feed_dict.
+
+    return self.sess.run(outputs, 
+              feed_dict = { 
+                  self.X_placeHolder : self.data["val_X"], 
+                  self.Y_placeHolder : self.data["val_Y"], 
+                  self.isTraining_placeHolder : False})
+    """
+    
+    return self.sess.run(outputs, feed_dict)
+
 
 
   #####################################################

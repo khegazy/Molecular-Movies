@@ -1,4 +1,4 @@
-#import tensorflow as tf
+import tensorflow as tf
 import numpy as np
 import molMovLSTM as mmLSTM
 import lstm_config as cf
@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
   ###  Import all the data  ####
   dataDir = "/reg/neh/home5/khegazy/analysis/machineLearning/simulation/output/"
-  dataX, dataY = mmLSTM.getData(dataDir, config)
+  dataX, dataX_Static, dataY, dataY_Static = mmLSTM.getData(dataDir, config)
 
   if verbose:
     print("Original data X/Y shape:  {}  /  {}".format(dataX.shape, dataY.shape))
@@ -35,12 +35,19 @@ if __name__ == '__main__':
   ind1 = int(np.ceil(config.trainRatio*Nevents))
   ind2 = int(np.ceil((config.trainRatio + config.valRatio)*Nevents))
   ind3 = int(np.ceil((1 - config.testRatio)*Nevents))
-  data["train_X"] = dataX[randInds[:ind1],:]
-  data["train_Y"] = dataY[randInds[:ind1],:]
-  data["val_X"]   = dataX[randInds[ind1:ind2],:]
-  data["val_Y"]   = dataY[randInds[ind1:ind2],:]
-  data["test_X"]  = dataX[randInds[ind2:],:]
-  data["test_Y"]  = dataY[randInds[ind2],:]
+  data["train_X"]   = dataX[randInds[:ind1],:]
+  data["train_Y"]   = dataY[randInds[:ind1],:]
+  data["val_X"]     = dataX[randInds[ind1:ind2],:]
+  data["val_Y"]     = dataY[randInds[ind1:ind2],:]
+  data["test_X"]    = dataX[randInds[ind2:],:]
+  data["test_Y"]    = dataY[randInds[ind2],:]
+  data["static_X"]  = np.reshape(dataX_Static, (1,-1))
+  data["static_Y"]  = np.reshape(dataY_Static, (1,-1))
+  print("finished static X")
+  print(data["static_X"])
+  print("finished static X")
+  print(data["static_Y"])
+
 
   if verbose:
     print("Data was imported")
